@@ -33,7 +33,7 @@ class Downloader:
                 # url 在缓存中不可用
                 pass
             else:
-                if self.num_retries > 0 and 500 <= result['code'] < 600:
+                if (not result['code']) or (self.num_retries > 0 and 500 <= result['code'] < 600):
                     # 服务器错误, 因此忽略 result 中的缓存，重新下载
                     result = None
         if result is None:

@@ -28,14 +28,10 @@ def get_rolling_news_csv(top=50, get_content=True, classify=None, path=None):
     :param classify: str, 获取的滚动新闻的类别，默认为None，即"2509:全部"
     :param path: str, 文件保存路径
     """
-    try:
-        df = get_rolling_news(top=top, get_content=get_content, classify=classify)
-        if not path:
-            path = 'news.csv'
-        df.to_csv(path, index=False, encoding='utf-8')
-    except Exception as e:
-        print('get_rolling_news_csv error', e)
-        exit(1)
+    df = get_rolling_news(top=top, get_content=get_content, classify=classify)
+    if not path:
+        path = 'news.csv'
+    df.to_csv(path, index=False, encoding='utf-8')
 
 
 def get_rolling_news(top=50, get_content=True, classify=None):
@@ -46,39 +42,68 @@ def get_rolling_news(top=50, get_content=True, classify=None):
     :param classify: str, 获取的滚动新闻的类别，默认为None，即"2509:全部"
     :return: pd.DataFrame, 新闻信息数据框
     """
-    try:
-        if classify and (classify not in cts.classifications):
-            print('please set the parameter classify to be one of {}'.format(cts.classifications))
-            exit(1)
-        lid = cts.classification2lid.get(classify, '2509')
-        classify = cts.lid2classification[lid]
-        num_list = [cts.max_num_per_page] * (top // cts.max_num_per_page)
-        last_page_num = top % cts.max_num_per_page
-        if last_page_num:
-            num_list += [last_page_num]
+    if classify:
+        assert classify in cts.classifications, (
+            '请设置 classify 为 {}中的一个'.format(cts.classifications)
+        )
 
-        df_data = []
-        for page, num in enumerate(num_list, start=1):
-            r = random.random()
-            url = cts.template_url.format(lid, num, page, r)
-            response = no_cache_downloader(url)
-            response_dict = json.loads(response)
-            data_list = response_dict['result']['data']
+    lid = cts.classification2lid.get(classify, '2509')
+    classify = cts.lid2classification[lid]
+    num_list = [cts.max_num_per_page] * (top // cts.max_num_per_page)
+    last_page_num = top % cts.max_num_per_page
+    if last_page_num:
+        num_list += [last_page_num]
 
-            for data in data_list:
-                ctime = datetime.fromtimestamp(int(data['ctime']))
-                ctime = datetime.strftime(ctime, '%Y-%m-%d %H:%M')
-                url = data['url']
-                row = [classify, data['title'], ctime,
-                       url, data['wapurl'], data['media_name'], data['keywords']]
-                if get_content:
-                    row.append(get_news_content(url))
-                df_data.append(row)
-        df = pd.DataFrame(df_data, columns=cts.columns if get_content else cts.columns[:-1])
-        return df
-    except Exception as e:
-        print('get_rolling_news error', e)
-        exit(1)
+    df_data = []
+    for page, num in enumerate(num_list, start=1):
+        r = random.random()
+        url = cts.template_url.format(lid, num, page, r)
+        response = no_cache_downloader(url)
+        response_dict = json.loads(response)
+        data_list = response_dict['result']['data']
+
+        for data in data_list:
+            ctime = datetime.fromtimestamp(int(data['ctime']))
+            ctime = datetime.strftime(ctime, '%Y-%m-%d %H:%M')
+            url = data['url']
+            row = [classify, data['title'], ctime,
+                   url, data['wapurl'], data['media_name'], data['keywords']]
+            if get_content:
+                row.append(get_news_content(url))
+            df_data.append(row)
+    df = pd.DataFrame(df_data, columns=cts.columns if get_content else cts.columns[:-1])
+    return df
+
+
+def get_rolling_news_url(top=50, classify=None):
+    """
+    获取新浪滚动新闻url
+    :param top: int, 获取的滚动新闻条数，默认为50
+    :param classify: str, 获取的滚动新闻的类别，默认为None，即"2509:全部"
+    :return: pd.DataFrame, 新闻信息数据框
+    """
+    if classify:
+        assert classify in cts.classifications, (
+            '请设置 classify 为 {}中的一个'.format(cts.classifications)
+        )
+
+    lid = cts.classification2lid.get(classify, '2509')
+    num_list = [cts.max_num_per_page] * (top // cts.max_num_per_page)
+    last_page_num = top % cts.max_num_per_page
+    if last_page_num:
+        num_list += [last_page_num]
+
+    urls = []
+    for page, num in enumerate(num_list, start=1):
+        r = random.random()
+        url = cts.template_url.format(lid, num, page, r)
+        response = no_cache_downloader(url)
+        response_dict = json.loads(response)
+        data_list = response_dict['result']['data']
+        for data in data_list:
+            url = data['url']
+            urls.append(url)
+    return urls
 
 
 def get_news_content(url):
@@ -103,7 +128,7 @@ def get_news_content(url):
         content = re.sub(r'\s*(\s)', r'\1', content)
         content = content.strip()
     except Exception as e:
-        print('get_news_content(%s) error' % url, e)
+        print('get_news_content(%s) error:' % url, e)
     return content
 
 
